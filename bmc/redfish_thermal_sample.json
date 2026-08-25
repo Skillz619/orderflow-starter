@@ -1,0 +1,39 @@
+{
+  "@odata.type": "#Thermal.v1_7_0.Thermal",
+  "Id": "Thermal",
+  "Name": "Thermal",
+  "Temperatures": [
+    {
+      "Name": "CPU1 Temp",
+      "ReadingCelsius": 58,
+      "UpperThresholdNonCritical": 80,
+      "UpperThresholdCritical": 90,
+      "Status": { "Health": "OK", "State": "Enabled" }
+    },
+    {
+      "Name": "CPU2 Temp",
+      "ReadingCelsius": 94,
+      "UpperThresholdNonCritical": 80,
+      "UpperThresholdCritical": 90,
+      "Status": { "Health": "Critical", "State": "Enabled" }
+    },
+    {
+      "Name": "Inlet Temp",
+      "ReadingCelsius": 24,
+      "UpperThresholdNonCritical": 35,
+      "UpperThresholdCritical": 45,
+      "Status": { "Health": "OK", "State": "Enabled" }
+    },
+    {
+      "Name": "Exhaust Temp",
+      "ReadingCelsius": 41,
+      "UpperThresholdNonCritical": 40,
+      "UpperThresholdCritical": 55,
+      "Status": { "Health": "Warning", "State": "Enabled" }
+    }
+  ],
+  "Fans": [
+    { "Name": "Fan1", "Reading": 4200, "ReadingUnits": "RPM", "Status": { "Health": "OK", "State": "Enabled" } },
+    { "Name": "Fan2", "Reading": 0, "ReadingUnits": "RPM", "Status": { "Health": "Critical", "State": "Enabled" } }
+  ]
+}

@@ -1,0 +1,64 @@
+# Partial OpenTelemetry Collector config.
+#
+# The `orderflow` app will send OTLP traces + metrics to this Collector
+# on localhost:4317. Your job is to finish the pipeline.
+#
+# Already done for you: the receiver, and a memory_limiter so a runaway
+# app can't OOM the Collector.
+
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+
+processors:
+  memory_limiter:
+    check_interval: 1s
+    limit_mib: 200
+    spike_limit_mib: 50
+
+  # TODO(4): batch — buffer telemetry and export in batches instead of
+  # one-by-one. Sized conservatively for a low-traffic demo service;
+  # in production you'd tune these to your actual throughput.
+  batch:
+    timeout: 5s
+    send_batch_size: 512
+
+  # TODO(5): probabilistic_sampler — keep 30% of traces. This is a
+  # head-based sampler: the decision is made (and propagated via the
+  # sampled flag) at the start of the trace, so a whole trace is kept
+  # or dropped together — you never end up with a parent span present
+  # and a child span missing. Tradeoff discussed in ANSWERS.md Q1/Q3-
+  # adjacent territory: lower cost and Collector load, at the cost of
+  # losing visibility into 70% of individual requests (mitigated by the
+  # fact that metrics — unsampled — still capture aggregate behavior).
+  probabilistic_sampler:
+    sampling_percentage: 30
+
+exporters:
+  logging:
+    verbosity: detailed
+
+  prometheus:
+    endpoint: 0.0.0.0:8889
+
+service:
+  pipelines:
+    traces:
+      receivers: [otlp]
+      # memory_limiter first (safety valve) -> sampler (drop what we don't
+      # need before doing more work on it) -> batch last (efficient export).
+      processors: [memory_limiter, probabilistic_sampler, batch]
+      exporters: [logging]
+
+    metrics:
+      receivers: [otlp]
+      # probabilistic_sampler is trace-only, so metrics just get
+      # memory_limiter -> batch. Metrics aren't sampled here on purpose:
+      # they're pre-aggregated, so thinning them loses accuracy for
+      # comparatively little cost saved, unlike thinning raw spans.
+      processors: [memory_limiter, batch]
+      exporters: [prometheus]

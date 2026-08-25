@@ -1,0 +1,96 @@
+# node-telemetry-daemonset.yaml
+#
+# Intent: deploy `node-telemetry-agent` as a DaemonSet so it runs on
+# EVERY node in the cluster -- control-plane nodes included, since the
+# whole point is fleet-wide CPU/scheduler visibility -- and exports
+# host-level telemetry (cgroup throttling, run-queue latency) by reading
+# /proc and /sys directly, in the vein of a node-exporter or eBPF
+# scheduler exporter sidecar.
+#
+# This manifest was written in a hurry and has real problems in it: at
+# least one that means it will never schedule a single pod, and at
+# least two more that are silent -- they run, they look fine in `kubectl
+# get pods`, and they're still wrong. Find them and fix them. You do
+# NOT need a running cluster to do this exercise -- reasoning about the
+# spec is the point. If you do have kind/minikube handy, feel free to
+# validate with `kubectl apply --dry-run=client -f daemonset-broken.yaml`
+# and include the output, but it's optional.
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: node-telemetry-agent
+  namespace: observability
+  labels:
+    app: node-telemetry-agent
+spec:
+  selector:
+    matchLabels:
+      # BUG 1 (fatal): this was `app: node-telemetry`, which does not
+      # match spec.template.metadata.labels below. A DaemonSet's
+      # selector MUST match its pod template's labels exactly, or the
+      # API server rejects the object at admission time -- before a
+      # single pod is ever scheduled. Fixed to match.
+      app: node-telemetry-agent
+  template:
+    metadata:
+      labels:
+        app: node-telemetry-agent
+    spec:
+      # BUG 2 (silent): no tolerations were set. Control-plane nodes
+      # carry a NoSchedule taint specifically to keep ordinary
+      # workloads off them, so without a matching toleration this
+      # DaemonSet silently skips control-plane nodes -- contradicting
+      # the stated intent ("control-plane nodes included") right in
+      # the header comment. Every pod that DID schedule still shows
+      # up healthy in `kubectl get pods`, so this is easy to miss.
+      # Both taint keys are tolerated to cover clusters on either the
+      # current (1.24+) or legacy naming.
+      tolerations:
+        - key: node-role.kubernetes.io/control-plane
+          effect: NoSchedule
+        - key: node-role.kubernetes.io/master
+          effect: NoSchedule
+      containers:
+        - name: node-telemetry-agent
+          image: canyoncode/node-telemetry-agent:1.4.2
+          ports:
+            - containerPort: 9464
+              name: metrics
+          # BUG 3 (silent): no resources block means this pod gets
+          # Best-Effort QoS -- the FIRST class kubelet evicts under
+          # node memory pressure. For a node-level telemetry agent
+          # that's backwards: it disappears exactly when the node is
+          # struggling and you need visibility most. Also invisible
+          # in `kubectl get pods` until an actual incident triggers
+          # eviction. Values below are placeholders -- size to the
+          # agent's real footprint.
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 200m
+              memory: 128Mi
+          volumeMounts:
+            - name: proc
+              mountPath: /host/proc
+              # Hardening: nothing about this workload should ever
+              # WRITE to host /proc or /sys -- readOnly narrows the
+              # blast radius if the agent is ever compromised.
+              readOnly: true
+              # Without mountPropagation, mounts that appear under
+              # /proc/sys on the HOST after this pod starts (e.g. a
+              # new cgroup) are invisible inside the container --
+              # another "looks fine, quietly stale" failure mode.
+              mountPropagation: HostToContainer
+            - name: sys
+              mountPath: /host/sys
+              readOnly: true
+              mountPropagation: HostToContainer
+      volumes:
+        - name: proc
+          hostPath:
+            path: /proc
+        - name: sys
+          hostPath:
+            path: /sys
