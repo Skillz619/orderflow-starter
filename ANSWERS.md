@@ -100,4 +100,5 @@ would each one tell you?
 `top`/`htop` first for a quick read on whether it's CPU or memory bound and which process is eating resources, `iostat -x 1` to check disk since high `%util`/await times point to an I/O bottleneck instead, `free -h` for a clearer memory picture especially how much is in swap (a very common cause of "randomly slow"), and `dmesg | tail` to check for OOM killer activity or kernel-level hardware errors that top/iostat won't show at all.
 
 
-**What I'd do differently with more time:** actually stand up a real tracing backend (Jaeger/Tempo) instead of relying on Collector console logs, and add unit tests around `parse_redfish_thermal()` for the missing-field edge cases rather than just eyeballing the sample output.
+#**What I'd do differently with more time:** 
+Biggest gap is I never wired up a real backend — Jaeger or Tempo — so I was reading raw spans out of Collector logs instead of an actual trace viewer, which is fine for proving the pipeline works but not how I'd actually debug this day to day. I'd also want real tests around the Redfish parser's edge cases instead of just checking it against one sample payload
