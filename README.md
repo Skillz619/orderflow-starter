@@ -1,4 +1,4 @@
-# orderflow — Observability Engineer Intern take-home
+# orderflow — Observability Engineer take home
 
 Full instructions are in the assignment doc you were sent. Quick start:
 
